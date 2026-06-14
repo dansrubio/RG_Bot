@@ -1,0 +1,1 @@
+from .handler import register_free_games_handler

@@ -1,0 +1,12 @@
+rg_manager.session*
+*.session
+*.session-journal
+.venv
+.env
+.env.local
+*.key
+*.pem
+config.env
+config.local.env
+config.dev.env
+rg_manager.session
