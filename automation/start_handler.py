@@ -68,7 +68,7 @@ async def _notificar_solicitud_admin(context: ContextTypes.DEFAULT_TYPE, user, e
 
         # Texto del log simplificado
         texto_log = (
-            f"👤 <b>Usuario:</b> {user_mention}{username} / <code>{user.id}</code>\n\n"
+            f"👤 {user_mention}{username} / <code>{user.id}</code>\n\n"
             f"📦 <b>Elemento:</b> ({nombre_almacen}) <code>{nombre_elemento}</code>"
         )
 
