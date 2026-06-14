@@ -51,8 +51,9 @@ from external_apis.rebrandly import register_rebrandly_handler
 from external_apis.qr_generator import register_qr_handler
 from external_apis.free_games import register_free_games_handler
 from external_apis.steam_api import register_game_handlers
+from external_apis.tmdb_api import register_cine_handlers  # <--- NUEVO HANDLER TMDB
 from external_apis.igdb_api import register_ps4_handlers
-from external_apis.game_search import register_search_handler  # <--- NUEVO BUSCADOR GLOBAL
+from external_apis.game_search import register_search_handler
 
 from helpers.auto_publisher import register_auto_publisher
 from helpers.random_handler import register_random_handler
@@ -110,12 +111,17 @@ def registrar_handlers(app: Application):
         logger.error(f"Error registrando game_handlers: {e}")
         
     try:
+        register_cine_handlers(app)  # <--- SE REGISTRA EL MÓDULO /cine AQUÍ
+    except Exception as e:
+        logger.error(f"Error registrando cine_handlers: {e}")
+        
+    try:
         register_ps4_handlers(app)
     except Exception as e:
         logger.error(f"Error registrando ps4_handlers: {e}")
         
     try:
-        register_search_handler(app)  # <--- SE REGISTRA EL COMANDO /busqueda AQUÍ
+        register_search_handler(app)
     except Exception as e:
         logger.error(f"Error registrando search_handler (busqueda): {e}")
 
@@ -133,7 +139,7 @@ async def iniciar_bot(app: Application):
     )
 
     try:
-        await asyncio.Event().wait()  # Bloquea indefinidamente hasta cancelación externa
+        await asyncio.Event().wait()
     finally:
         await app.updater.stop()
         await app.stop()
@@ -152,7 +158,7 @@ async def tarea_bot(app: Application):
             f"💥 Bot principal falló: {e}\n"
             f"   → Si el error dice 'token rejected', regenera el token en BotFather (/newtoken)."
         )
-        raise  # re-lanzar: el bot no puede correr sin token válido
+        raise
 
 
 async def tarea_userbot():
@@ -168,7 +174,6 @@ async def tarea_userbot():
             f"   → El bot principal sigue funcionando sin el userbot.\n"
             f"   → El comando /index no estará disponible hasta reiniciar."
         )
-        # No re-lanzar: el fallo del userbot es recuperable
 
 
 async def main_async():
@@ -189,15 +194,13 @@ async def main_async():
     logger.info("🚀 Iniciando bot principal y userbot...")
 
     try:
-        # return_exceptions=True: si tarea_userbot termina con error, tarea_bot sigue corriendo
-        # tarea_userbot ya absorbe su propia excepción, así que solo tarea_bot puede fallar aquí
         resultados = await asyncio.gather(
             tarea_bot(app),
             tarea_userbot(),
             return_exceptions=True,
         )
 
-        for resultado in resultados:  # loguear cualquier excepción que no se haya logueado aún
+        for resultado in resultados:
             if isinstance(resultado, BaseException):
                 logger.error(f"Tarea terminada con error: {resultado}")
 
