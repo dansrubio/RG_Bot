@@ -583,7 +583,7 @@ async def manejar_respuesta_admin(update: Update, context: ContextTypes.DEFAULT_
             ticket = cerrar_ticket(user_id, chat_id, message_id, "completado")
             texto_pedido = ticket.get("texto", "tu pedido") if ticket else "tu pedido"
             
-            mensaje_grupo = f"✅ {usuario_mencion}, <b>¡Solicitud Completada!</b>\nEl juego (<i>{texto_pedido}</i>) que pediste ya fue publicado.\n\n👨‍💻 <i>Atendido por: {admin_name}</i>"
+            mensaje_grupo = f"✅ {usuario_mencion}, <b>¡Solicitud Completada!</b>\nTu pedido ya fue publicado. Revisa el canal correspondiente.\n\n👨‍💻 <i>Atendido por: {admin_name}</i>"
             botones_grupo = InlineKeyboardMarkup([[InlineKeyboardButton("Ver canal", url="https://t.me/Refugio_Gamer")]])
             estado_ticket = "✅ SOLICITUD COMPLETADA\n"
         
