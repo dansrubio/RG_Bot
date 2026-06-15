@@ -66,7 +66,7 @@ from info.userinfo import register_userinfo_handlers
 from info.channelinfo import register_channel_handlers
 from info.user_command import register_user_command_handler
 
-from userbot_indexer import iniciar_userbot
+from userbot.manager import iniciar_userbot
 
 
 logger = logging.getLogger(__name__)
