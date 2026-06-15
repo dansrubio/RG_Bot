@@ -10,3 +10,10 @@ config.env
 config.local.env
 config.dev.env
 rg_manager.session
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
