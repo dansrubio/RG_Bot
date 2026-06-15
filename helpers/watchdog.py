@@ -16,9 +16,9 @@ logging.getLogger("telegram.ext").setLevel(logging.WARNING)
 
 # Estado de las últimas alertas para evitar spam
 last_alert_state = {"cpu": False, "ram": False, "disk": False}
-CPU_THRESHOLD = 110  # Umbral de CPU en %
-RAM_THRESHOLD = 110  # Umbral de RAM en %
-DISK_THRESHOLD = 110  # Umbral de disco en %
+CPU_THRESHOLD = 90  # Umbral de CPU en %
+RAM_THRESHOLD = 90  # Umbral de RAM en %
+DISK_THRESHOLD = 90  # Umbral de disco en %
 
 
 async def watchdog_task(application):

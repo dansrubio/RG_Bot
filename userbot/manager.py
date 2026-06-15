@@ -15,14 +15,12 @@ from automation.autoliker_userbot import registrar_autoliker_userbot
 # Importamos los registradores de comandos del Userbot
 from userbot.index import register_index_handler
 from userbot.info import register_info_handler
-from userbot.clonar import register_clonar_handler
 
 logger = logging.getLogger(__name__)
 
 API_ID = int(os.getenv("USERBOT_API_ID", "0"))
 API_HASH = os.getenv("USERBOT_API_HASH", "")
 SESSION_NAME = os.getenv("USERBOT_SESSION", "rg_manager")
-KEYWORD = "🎲 Géneros:"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 _estado_userbot = {
@@ -41,7 +39,9 @@ def get_estado_userbot() -> dict:
 # =========================================================
 def es_mensaje_elemento(msg) -> bool:
     tiene_foto = isinstance(getattr(msg, "media", None), MessageMediaPhoto)
-    tiene_keyword = KEYWORD in (msg.message or "")
+    # Convertimos a minúsculas para hacerlo insensible a fallos de tipeo
+    texto_mensaje = (msg.message or "").lower()
+    tiene_keyword = "🎲 géneros:" in texto_mensaje or "géneros:" in texto_mensaje
     return tiene_foto and tiene_keyword
 
 def extraer_nombre(texto: str) -> str:
@@ -96,20 +96,32 @@ def chat_es_almacen(chat_id_telethon: int) -> bool:
             return True
     return False
 
-async def recolectar_mensajes(client, chat_id: int, desde_id: int, hasta_id: int) -> dict:
+async def recolectar_mensajes(client, chat_id: int, desde_id: int, hasta_id: int, status_msg=None) -> dict:
     mensajes = {}
     try:
-        async for msg in client.iter_messages(chat_id, min_id=desde_id - 1, max_id=hasta_id + 1, reverse=True):
+        # Quitamos reverse=True para evitar bugs internos de Telethon en grupos grandes
+        async for msg in client.iter_messages(chat_id, min_id=desde_id - 1, max_id=hasta_id + 1):
             if msg.id >= desde_id and msg.id <= hasta_id:
                 mensajes[msg.id] = msg
+                
     except FloodWaitError as e:
         logger.warning(f"⏳ FloodWait detectado en recolección. Esperando {e.seconds} segundos...")
+        
+        if status_msg:
+            try:
+                minutos = e.seconds // 60
+                await status_msg.edit(f"⏳ **Límite de Telegram detectado.**\nEl userbot debe pausar por {minutos} minutos. Reanudará automáticamente...")
+            except Exception:
+                pass
+                
         await asyncio.sleep(e.seconds)
-        # Reintentar recursivamente a partir del último punto guardado de forma segura
-        ultimo_procesado = max(mensajes.keys() or [desde_id])
+        
+        # Reintentar recursivamente desde el último ID seguro (-1 para no omitir el causante del corte)
+        ultimo_procesado = max(mensajes.keys() or [desde_id - 1])
         if ultimo_procesado < hasta_id:
-            faltantes = await recolectar_mensajes(client, chat_id, ultimo_procesado + 1, hasta_id)
+            faltantes = await recolectar_mensajes(client, chat_id, ultimo_procesado + 1, hasta_id, status_msg)
             mensajes.update(faltantes)
+            
     return mensajes
 
 def detectar_bloques(mensajes: dict, id_limite_final: int) -> list:
@@ -195,12 +207,26 @@ async def enviar_confirmacion(chat_id: int, task_id: str, ids_nuevos: list, tota
 
     resumen = "\n".join(lineas)
     if len(ids_nuevos) > 10: resumen += f"\n...y {len(ids_nuevos) - 10} más"
-    canal_destino = ALMACENES_MAP.get(chat_id, CANAL_ELEMENTOS)
+    
+    # Mapeo de canal corrigiendo la diferencia de IDs (normalizando)
+    canal_destino = CANAL_ELEMENTOS
+    id_norm = normalizar_chat_id(abs(chat_id))
+    for almac, dest in ALMACENES_MAP.items():
+        if normalizar_chat_id(abs(almac)) == id_norm:
+            canal_destino = dest
+            break
+            
     texto = f"✅ Indexado completado\n\n📊 Mensajes analizados: {total_analizados}\n📦 Elementos creados: {len(ids_nuevos)}\n📺 Canal destino: {canal_destino}\n\nDetalle:\n{resumen}\n\n¿Publicar todos en el canal ahora?"
     teclado = {"inline_keyboard": [[{"text": "✅ Confirmar", "callback_data": f"idxpub_confirm_{task_id}"}, {"text": "❌ Cancelar", "callback_data": f"idxpub_cancel_{task_id}"}]]}
 
     async with httpx.AsyncClient() as http:
-        await http.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": texto, "reply_markup": teclado}, timeout=15)
+        response = await http.post(
+            f"{TELEGRAM_API}/sendMessage", 
+            json={"chat_id": chat_id, "text": texto, "reply_markup": teclado}, 
+            timeout=15
+        )
+        # Fuerza que el error sea arrojado si el bot no tiene permisos de envío
+        response.raise_for_status()
 
 # =========================================================
 # 🚀 FUNCIÓN DE INICIO PRINCIPAL CON RECONEXIÓN AUTOMÁTICA
@@ -233,7 +259,6 @@ async def iniciar_userbot() -> None:
             # Registro de manejadores pasándole los parámetros requeridos
             register_index_handler(client, _estado_userbot, helpers)
             register_info_handler(client)
-            register_clonar_handler(client)  # <--- Comando dinámico /clonar registrado con éxito
 
             registrar_autoliker_userbot(client, BOT_TOKEN, CANAL_ELEMENTOS, GROUP_ADMIN_ID)
 

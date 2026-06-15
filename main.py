@@ -51,7 +51,7 @@ from external_apis.rebrandly import register_rebrandly_handler
 from external_apis.qr_generator import register_qr_handler
 from external_apis.free_games import register_free_games_handler
 from external_apis.steam_api import register_game_handlers
-from external_apis.tmdb_api import register_cine_handlers  # <--- NUEVO HANDLER TMDB
+from external_apis.tmdb_api import register_cine_handlers  
 from external_apis.igdb_api import register_ps4_handlers
 from external_apis.game_search import register_search_handler
 
@@ -60,14 +60,10 @@ from helpers.random_handler import register_random_handler
 from helpers.wow_token_handler import register_wow_token_handlers
 from helpers.auto_response import register_auto_response_handler
 from helpers.daily_summary import register_daily_summary
-
-from info.watchdog import register_watchdog
-from info.userinfo import register_userinfo_handlers
-from info.channelinfo import register_channel_handlers
-from info.user_command import register_user_command_handler
+from helpers.watchdog import register_watchdog
+from helpers.user_command import register_user_command_handler
 
 from userbot.manager import iniciar_userbot
-
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +79,6 @@ def configurar_logging():
 
 def registrar_handlers(app: Application):
     """Registra todos los handlers del bot de forma organizada"""
-    # Handlers estándar que solo requieren el objeto 'app'
     handlers = [
         register_message_tracker, register_cleaner, register_hashtag_forwarder, 
         register_start_handler, register_verification_handler, register_rebrandly_handler, 
@@ -93,8 +88,7 @@ def registrar_handlers(app: Application):
         register_yugioh_handler, register_top_elementos_handler, register_juego_aleatorio_handler, 
         register_daily_summary, register_busqueda_elemento_handler, register_index_publisher_handler,
         register_db_backup_handler, register_db_restore_handler, register_notify_handler, 
-        register_mod_manager_handlers, register_userinfo_handlers, register_channel_handlers, 
-        register_stats_handlers, register_user_command_handler, register_watchdog, 
+        register_mod_manager_handlers, register_stats_handlers, register_user_command_handler, register_watchdog, 
         register_auto_response_handler, register_recomendaciones_handlers,
     ]
 
@@ -105,69 +99,54 @@ def registrar_handlers(app: Application):
             logger.error(f"Error registrando {registrar.__name__}: {e}")
 
     # ── Módulos de búsqueda ──
-    try:
-        register_game_handlers(app)
-    except Exception as e:
-        logger.error(f"Error registrando game_handlers: {e}")
-        
-    try:
-        register_cine_handlers(app)  # <--- SE REGISTRA EL MÓDULO /cine AQUÍ
-    except Exception as e:
-        logger.error(f"Error registrando cine_handlers: {e}")
-        
-    try:
-        register_ps4_handlers(app)
-    except Exception as e:
-        logger.error(f"Error registrando ps4_handlers: {e}")
-        
-    try:
-        register_search_handler(app)
-    except Exception as e:
-        logger.error(f"Error registrando search_handler (busqueda): {e}")
-
-async def iniciar_bot(app: Application):
-    """Inicializa y corre el bot principal en modo async"""
-    await app.initialize()
-    await app.start()
-
-    print("🟢 BOT INICIADO CORRECTAMENTE 🟢", flush=True)
-    sys.stdout.flush()
-
-    await app.updater.start_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-    )
-
-    try:
-        await asyncio.Event().wait()
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
+    modulos_busqueda = [
+        (register_game_handlers, "game_handlers"),
+        (register_cine_handlers, "cine_handlers"),
+        (register_ps4_handlers, "ps4_handlers"),
+        (register_search_handler, "search_handler (busqueda)")
+    ]
+    
+    for registrar, nombre in modulos_busqueda:
+        try:
+            registrar(app)
+        except Exception as e:
+            logger.error(f"Error registrando {nombre}: {e}")
 
 
 async def tarea_bot(app: Application):
-    """
-    Wrapper del bot principal.
-    Si el token es inválido, muestra un mensaje claro y re-lanza para detener el proceso.
-    """
+    """Wrapper asíncrono para inicializar y arrancar el sondeo del bot principal"""
     try:
-        await iniciar_bot(app)
+        await app.initialize()
+        await app.start()
+        print("🟢 BOT INICIADO CORRECTAMENTE 🟢", flush=True)
+        sys.stdout.flush()
+        
+        await app.updater.start_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+        )
+        # Este evento mantiene vivo el bot de forma asíncrona dentro de la tarea
+        await asyncio.Event().wait()
     except Exception as e:
         logger.critical(
             f"💥 Bot principal falló: {e}\n"
-            f"   → Si el error dice 'token rejected', regenera el token en BotFather (/newtoken)."
+            f"   → Si el error dice 'token rejected', regenera el token en BotFather."
         )
         raise
+    finally:
+        if app.updater.running:
+            await app.updater.stop()
+        if app.running:
+            await app.stop()
+        await app.shutdown()
 
 
 async def tarea_userbot():
-    """
-    Wrapper del userbot.
-    Si falla por cualquier razón, lo registra y termina sin matar el bot principal.
-    """
+    """Wrapper asíncrono para el ciclo de vida del userbot"""
     try:
         await iniciar_userbot()
+    except asyncio.CancelledError:
+        logger.info("🛑 Userbot cancelado por el proceso principal.")
     except Exception as e:
         logger.error(
             f"⚠️ Userbot falló y fue desactivado: {e}\n"
@@ -177,8 +156,8 @@ async def tarea_userbot():
 
 
 async def main_async():
-    """Corre el bot principal y el userbot en paralelo dentro del mismo event loop"""
-    print("⚙️ Configurando el bot, por favor espera...", flush=True)
+    """Supervisa y corre el bot principal y el userbot de forma paralela y segura"""
+    print("Configurando el bot...", flush=True)
 
     if not validate_config():
         logger.error("❌ Configuración inválida")
@@ -191,23 +170,28 @@ async def main_async():
     app = Application.builder().token(BOT_TOKEN).build()
     registrar_handlers(app)
 
-    logger.info("🚀 Iniciando bot principal y userbot...")
+    logger.info("🚀 Lanzando procesos concurrentes...")
+
+    # Creamos las referencias de tareas explícitas
+    bot_task = asyncio.create_task(tarea_bot(app))
+    userbot_task = asyncio.create_task(tarea_userbot())
 
     try:
-        resultados = await asyncio.gather(
-            tarea_bot(app),
-            tarea_userbot(),
-            return_exceptions=True,
-        )
-
-        for resultado in resultados:
-            if isinstance(resultado, BaseException):
-                logger.error(f"Tarea terminada con error: {resultado}")
-
+        # Monitoreamos la tarea del bot principal. Si cae, el flujo se rompe.
+        await bot_task  
     except Exception as e:
-        logger.error(f"💥 Error crítico inesperado: {e}")
-        return 1
+        logger.error(f"💥 Detención del loop por fallo crítico en el bot: {e}")
     finally:
+        # CORREGIDO: Evita que fallos tempranos del userbot fuercen un cierre de base de datos prematuro
+        if not userbot_task.done():
+            logger.info("Cerrando userbot de manera limpia...")
+            userbot_task.cancel()
+            try:
+                await userbot_task
+            except asyncio.CancelledError:
+                pass
+
+        print("🗄️ Apagando conexiones de bases de datos...")
         shutdown_database()
 
         from database.base import MOTOR_AVAILABLE
@@ -218,13 +202,12 @@ async def main_async():
 
 
 def main():
-    """Punto de entrada: configura logging y lanza el event loop"""
+    """Punto de entrada síncrono"""
     configurar_logging()
-
     try:
         return asyncio.run(main_async())
     except KeyboardInterrupt:
-        print("🛑 Bot detenido (Ctrl+C)")
+        print("\n🛑 Proceso interrumpido por el usuario (Ctrl+C). Exiting.")
         return 0
 
 

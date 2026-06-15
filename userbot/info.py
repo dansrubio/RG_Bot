@@ -52,7 +52,7 @@ def register_info_handler(client):
                 if reply_msg.media:
                     texto_respuesta += f"• **Tipo de Media:** `{type(reply_msg.media).__name__}`\n"
             else:
-                texto_respuesta += "💡 _Tip: Responde a un mensaje con /info para obtener los IDs del mensaje y del usuario._"
+                texto_respuesta += "💡 Tip: Responde a un mensaje con /info para obtener los IDs del mensaje y del usuario."
     
             # Responder directamente en el chat
             await event.reply(texto_respuesta)

@@ -27,12 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 def es_staff(user_id: int) -> bool:
-    """Verifica si el usuario es admin o moderador"""
     return is_admin(user_id) or is_moderator(user_id)
 
 
 def obtener_tarea(task_id: str) -> dict | None:
-    """Obtiene una tarea pendiente de MongoDB"""
     try:
         return get_database().publicacion_pendiente.find_one(
             {"_id": task_id, "estado": "pendiente"}
@@ -43,7 +41,6 @@ def obtener_tarea(task_id: str) -> dict | None:
 
 
 def marcar_tarea(task_id: str, estado: str) -> None:
-    """Actualiza el estado de una tarea en MongoDB"""
     try:
         get_database().publicacion_pendiente.update_one(
             {"_id": task_id},
@@ -54,10 +51,6 @@ def marcar_tarea(task_id: str, estado: str) -> None:
 
 
 def formatear_peso(bytes_total: int) -> str:
-    """
-    Convierte bytes a la unidad más legible.
-    Ejemplos: 734 MB | 2.15 GB | 450 KB
-    """
     if bytes_total <= 0:
         return ""
     if bytes_total >= 1_073_741_824:
@@ -69,24 +62,32 @@ def formatear_peso(bytes_total: int) -> str:
     return f"{bytes_total / 1024:.0f} KB"
 
 
+def normalizar_chat_id(chat_id: int) -> int:
+    """Extrae el número absoluto limpio del ID para comparaciones seguras"""
+    id_abs = abs(chat_id)
+    if str(id_abs).startswith("100"):
+        return int(str(id_abs)[3:])
+    return id_abs
+
+def obtener_canal_destino(almacen_origen: int) -> int:
+    """Busca el destino normalizando los IDs para evitar errores de mapeo"""
+    if not almacen_origen or not ALMACENES_MAP:
+        return CANAL_ELEMENTOS
+    id_norm = normalizar_chat_id(almacen_origen)
+    for almac, dest in ALMACENES_MAP.items():
+        if normalizar_chat_id(almac) == id_norm:
+            return dest
+    return CANAL_ELEMENTOS
+
+
 def entidades_a_html(texto: str, entidades: list) -> str:
-    """
-    Convierte un texto plano + lista de MessageEntity de Telegram a HTML.
-    Soporta: bold, italic, underline, strikethrough, code, pre, spoiler,
-    text_link, text_mention.
-    Los caracteres especiales HTML del texto se escapan correctamente.
-    """
     if not entidades or not texto:
         return escape(texto)
 
-    # Ordenar por offset ascendente para procesar de izquierda a derecha
     entidades_ord = sorted(entidades, key=lambda e: e.offset)
-
-    # Construir lista de eventos (apertura/cierre) por posición en bytes UTF-16
     texto_utf16  = texto.encode("utf-16-le")
     chars_utf16  = [texto_utf16[i:i+2] for i in range(0, len(texto_utf16), 2)]
 
-    # Mapear posición UTF-16 → posición en la cadena Python
     pos_utf16_a_py = {}
     py_idx = 0
     utf16_idx = 0
@@ -95,7 +96,7 @@ def entidades_a_html(texto: str, entidades: list) -> str:
         utf16_len = len(ch.encode("utf-16-le")) // 2
         utf16_idx += utf16_len
         py_idx    += 1
-    pos_utf16_a_py[utf16_idx] = py_idx  # posición final
+    pos_utf16_a_py[utf16_idx] = py_idx
 
     TAG_APERTURA = {
         "bold":                  "<b>",
@@ -147,12 +148,10 @@ def entidades_a_html(texto: str, entidades: list) -> str:
 
     for i, ch in enumerate(texto):
         if i in eventos_by_pos:
-            resultado.extend(eventos_by_pos[i][0])  # aperturas antes del char
-
+            resultado.extend(eventos_by_pos[i][0])
         resultado.append(escape(ch))
-
         if i in eventos_by_pos:
-            resultado.extend(eventos_by_pos[i][1])  # cierres después del char
+            resultado.extend(eventos_by_pos[i][1])
 
     fin = len(texto)
     if fin in eventos_by_pos:
@@ -161,12 +160,7 @@ def entidades_a_html(texto: str, entidades: list) -> str:
     return "".join(resultado)
 
 
-def inyectar_peso_en_caption(caption: str, peso_bytes: int,
-                              num_archivos: int) -> str:
-    """
-    Agrega al final del caption en negrita HTML:
-      <b>💾 Tamaño: X MB</b>   <b>📚 Archivos: N</b>
-    """
+def inyectar_peso_en_caption(caption: str, peso_bytes: int, num_archivos: int) -> str:
     partes = []
     peso_str = formatear_peso(peso_bytes)
     if peso_str:
@@ -177,9 +171,6 @@ def inyectar_peso_en_caption(caption: str, peso_bytes: int,
         return caption
     
     caption_clean = caption.strip()
-    
-    # FIX: Si termina en blockquote, Telegram ya mete un salto de línea grande. 
-    # Usamos solo un salto \n in vez de \n\n para evitar el bache visual.
     if caption_clean.endswith("</blockquote>"):
         separador = "\n"
     else:
@@ -189,33 +180,19 @@ def inyectar_peso_en_caption(caption: str, peso_bytes: int,
 
 
 def extraer_enlaces_juego(texto_plano: str, entidades: list) -> dict:
-    """
-    Extrae los enlaces de juego leyendo el texto plano + entidades.
-    Soporta el formato nuevo y agrupa el formato legacy.
-    Retorna dict con 'trailer', 'mas_informacion'
-    """
-    enlaces = {
-        'trailer': None,
-        'mas_informacion': None
-    }
-    
+    enlaces = {'trailer': None, 'mas_informacion': None}
     if not texto_plano or not entidades:
         return enlaces
     
-    # Nuevo mapeo que incluye soporte legacy redirigiendo a la nueva estructura
     emoji_map = {
-        '📺': 'trailer',
-        '🎬': 'trailer',
-        '📚': 'mas_informacion',
-        '📊': 'mas_informacion',
-        '🚂': 'mas_informacion'
+        '📺': 'trailer', '🎬': 'trailer',
+        '📚': 'mas_informacion', '📊': 'mas_informacion', '🚂': 'mas_informacion'
     }
     
     for ent in entidades:
         tipo = ent.type.name.lower() if hasattr(ent.type, "name") else str(ent.type)
         if tipo != "text_link":
             continue
-        
         try:
             inicio = ent.offset
             fin = ent.offset + ent.length
@@ -242,65 +219,43 @@ def extraer_enlaces_juego(texto_plano: str, entidades: list) -> dict:
                 elif any(word in texto_lower for word in ['más información', 'mas informacion', 'requisito', 'requerimiento', 'steam']):
                     emoji_encontrado = 'mas_informacion'
             
-            # Solo guardamos si el enlace es válido y no hemos registrado uno antes para esa clave
             if emoji_encontrado and url and not enlaces.get(emoji_encontrado):
                 enlaces[emoji_encontrado] = url
         except Exception as e:
-            logger.error(f"Error procesando entidad en extracción: {e}")
             continue
-            
     return enlaces
 
 
 def limpiar_enlaces_del_caption(caption: str) -> str:
-    """
-    Limpieza secundaria de seguridad para remover líneas de emojis/pipes huérfanos
-    después de haber removido las entidades links (Soporta formato nuevo y legacy).
-    """
     if not caption:
         return caption
-    
-    # Patrón actualizado para atrapar Emojis y Textos viejos + nuevos
     patron1 = r"\n?\s*[🎬📊🚂📺📚]\s*(?:Trailer|Requisitos|Steam|Más Información|Mas Informacion)?\s*\|\s*[🎬📊🚂📺📚].*$"
     caption = re.sub(patron1, "", caption, flags=re.MULTILINE | re.IGNORECASE)
-    
-    # Eliminar barras divisorias solas
     patron2 = r"\n?\s*(?:[🎬📊🚂📺📚]\s*\|?\s*){2,}\s*$"
     caption = re.sub(patron2, "", caption, flags=re.MULTILINE)
-
-    # Limpiar acumulaciones excesivas de saltos de línea sin romper párrafos legítimos
     caption = re.sub(r"\n{3,}", "\n\n", caption)
-    
-    # FIX: Eliminar saltos de línea huérfanos que queden atrapados justo después de un blockquote cerrado
     caption = re.sub(r"</blockquote>\s*\n+", "</blockquote>", caption)
-    
     return caption.strip()
 
 
 def construir_teclado_juego(enlaces: dict) -> InlineKeyboardMarkup | None:
-    """Construye un teclado inline con los dos botones del nuevo formato."""
     botones_fila = []
-    
     enlaces_validos = [
         ('trailer', '📺 Trailer', enlaces.get('trailer')),
         ('mas_informacion', '📚 Información', enlaces.get('mas_informacion')),
     ]
-    
     for tipo, emoji_texto, url in enlaces_validos:
         if url and isinstance(url, str) and url.startswith(('http://', 'https://', 't.me/')):
             try:
                 botones_fila.append(InlineKeyboardButton(text=emoji_texto, url=url))
-            except Exception as e:
-                logger.error(f"Error creando botón {emoji_texto}: {e}")
-    
+            except Exception:
+                pass
     if not botones_fila:
         return None
     return InlineKeyboardMarkup([botones_fila])
 
 
-def combinar_teclados(keyboard_base: InlineKeyboardMarkup | None,
-                      keyboard_juego: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup:
-    """Combina dos teclados inline en uno solo."""
+def combinar_teclados(keyboard_base: InlineKeyboardMarkup | None, keyboard_juego: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup:
     botones_combinados = []
     if keyboard_base and keyboard_base.inline_keyboard:
         botones_combinados.extend(keyboard_base.inline_keyboard)
@@ -309,44 +264,24 @@ def combinar_teclados(keyboard_base: InlineKeyboardMarkup | None,
     return InlineKeyboardMarkup(botones_combinados) if botones_combinados else InlineKeyboardMarkup([])
 
 
-def procesar_elemento_para_publicar(
-    texto_mensaje: str,
-    entidades_orig: list,
-    peso_bytes: int,
-    num_archivos: int
-) -> tuple[str, dict]:
-    """
-    Procesa un elemento extrayendo enlaces de juego, filtrando las entidades problemáticas 
-    desde el origen y saneando el formato del caption resultante.
-    """
-    # 1. Extraer enlaces de juego intactos
+def procesar_elemento_para_publicar(texto_mensaje: str, entidades_orig: list, peso_bytes: int, num_archivos: int) -> tuple[str, dict]:
     enlaces_juego = extraer_enlaces_juego(texto_mensaje, entidades_orig)
-    
-    # 2. Saneamiento de URLs de terceros si la función externa lo requiere
     if hay_urls_a_limpiar(texto_mensaje):
         caption_base, entidades_base = limpiar_texto_y_entidades(texto_mensaje, entidades_orig)
     else:
         caption_base, entidades_base = texto_mensaje, list(entidades_orig)
 
-    # 3. FILTRADO CRÍTICO: Remover las entidades text_link de juego antes de compilar el HTML
     entidades_filtradas = []
     urls_juego_valores = [v for v in enlaces_juego.values() if v]
-    
     for ent in entidades_base:
         tipo = ent.type.name.lower() if hasattr(ent.type, "name") else str(ent.type)
         if tipo == "text_link" and ent.url in urls_juego_valores:
             continue  
         entidades_filtradas.append(ent)
 
-    # 4. Convertir la estructura limpia y segura a HTML nativo
     caption_html = entidades_a_html(caption_base, entidades_filtradas)
-    
-    # 5. Sanear remanentes visuales de la línea de enlaces y corregir saltos post-citado
     caption_html = limpiar_enlaces_del_caption(caption_html)
-    
-    # 6. Inyectar metadatos de peso de manera elegante (con detección inteligente de blockquotes)
     caption_final = inyectar_peso_en_caption(caption_html, peso_bytes, num_archivos)
-    
     return caption_final, enlaces_juego
 
 
@@ -355,7 +290,6 @@ def procesar_elemento_para_publicar(
 # ──────────────────────────────────────────────
 
 async def index_publicar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja los botones de confirmación enviados por el userbot"""
     query = update.callback_query
     user  = query.from_user
     data  = query.data
@@ -389,14 +323,14 @@ async def index_publicar_callback(update: Update, context: ContextTypes.DEFAULT_
     errores      = 0
 
     await query.edit_message_text(
-        f"⏳ **Publicando {total} elementos...**\n\nIniciando proceso...",
-        parse_mode=ParseMode.MARKDOWN
+        f"⏳ <b>Publicando {total} elementos...</b>\n\nIniciando proceso...",
+        parse_mode=ParseMode.HTML
     )
 
     canal_destino_usado = None
 
     for idx, elemento_id in enumerate(elemento_ids, 1):
-        msg_tmp_id = None
+        msg_tmp_ids = []
 
         try:
             elemento_data = ElementoCRUD.obtener_elemento_por_id(elemento_id)
@@ -411,17 +345,25 @@ async def index_publicar_callback(update: Update, context: ContextTypes.DEFAULT_
             num_archivos    = elemento_data.get("num_archivos", 0)
             enlace_elemento = f"{BOT_URL}?start={token}"
 
-            # NUEVO SISTEMA: Origen y destino dinámicos
             almacen_origen = elemento_data.get("almacen_id") or ADMINISTRATION_GROUP
-            canal_destino = ALMACENES_MAP.get(almacen_origen) or CANAL_ELEMENTOS
+            canal_destino = obtener_canal_destino(almacen_origen)
             canal_destino_usado = canal_destino
+
+            # 🛠️ HACK: Bypass de protección de reenvío.
+            # Copiamos primero (permitido) y reenviamos esa copia para leer las entities enteras
+            msg_tmp_copy = await context.bot.copy_message(
+                chat_id=query.message.chat_id,
+                from_chat_id=almacen_origen,
+                message_id=id_inicio
+            )
+            msg_tmp_ids.append(msg_tmp_copy.message_id)
 
             mensaje_origen = await context.bot.forward_message(
                 chat_id=query.message.chat_id,
-                from_chat_id=almacen_origen, # Actualizado
-                message_id=id_inicio
+                from_chat_id=query.message.chat_id,
+                message_id=msg_tmp_copy.message_id
             )
-            msg_tmp_id = mensaje_origen.message_id
+            msg_tmp_ids.append(mensaje_origen.message_id)
 
             tiene_caption   = mensaje_origen.caption is not None
             texto_mensaje   = mensaje_origen.caption or mensaje_origen.text or ""
@@ -430,25 +372,16 @@ async def index_publicar_callback(update: Update, context: ContextTypes.DEFAULT_
             entidades_orig  = mensaje_origen.caption_entities or mensaje_origen.entities or []
 
             caption_final, enlaces_juego = procesar_elemento_para_publicar(
-                texto_mensaje,
-                entidades_orig,
-                peso_bytes,
-                num_archivos
+                texto_mensaje, entidades_orig, peso_bytes, num_archivos
             )
-
-            await context.bot.delete_message(
-                chat_id=query.message.chat_id,
-                message_id=msg_tmp_id
-            )
-            msg_tmp_id = None
 
             keyboard_base = construir_teclado_botones(enlace_elemento, boton_texto, urls_especiales)
             keyboard_juego = construir_teclado_juego(enlaces_juego)
             keyboard = combinar_teclados(keyboard_base, keyboard_juego)
 
             copy_kwargs = {
-                "chat_id":      canal_destino,  # Actualizado
-                "from_chat_id": almacen_origen, # Actualizado
+                "chat_id":      canal_destino,
+                "from_chat_id": almacen_origen,
                 "message_id":   id_inicio,
             }
             
@@ -468,43 +401,45 @@ async def index_publicar_callback(update: Update, context: ContextTypes.DEFAULT_
         except TelegramError as e:
             logger.error(f"TelegramError publicando elemento {elemento_id}: {e}")
             errores += 1
-            if msg_tmp_id:
-                try:
-                    await context.bot.delete_message(chat_id=query.message.chat_id, message_id=msg_tmp_id)
-                except Exception:
-                    pass
 
         except Exception as e:
             logger.error(f"Error publicando elemento {elemento_id}: {e}", exc_info=True)
             errores += 1
 
+        finally:
+            # Limpieza segura sin importar si falló
+            for m_id in msg_tmp_ids:
+                try:
+                    await context.bot.delete_message(chat_id=query.message.chat_id, message_id=m_id)
+                except Exception:
+                    pass
+
         try:
             await query.edit_message_text(
-                f"⏳ **Publicando {total} elementos...**\n\n"
-                f"📊 Progreso: `{idx}/{total}`\n"
-                f"✅ Exitosos: `{exitosos}`\n"
-                f"❌ Errores: `{errores}`",
-                parse_mode=ParseMode.MARKDOWN
+                f"⏳ <b>Publicando {total} elementos...</b>\n\n"
+                f"📊 Progreso: <code>{idx}/{total}</code>\n"
+                f"✅ Exitosos: <code>{exitosos}</code>\n"
+                f"❌ Errores: <code>{errores}</code>",
+                parse_mode=ParseMode.HTML
             )
         except TelegramError:
             pass
 
     try:
         await query.edit_message_text(
-            f"✅ **Publicación completada**\n\n"
-            f"📦 Total procesados: `{total}`\n"
-            f"✅ Exitosos: `{exitosos}`\n"
-            f"❌ Errores: `{errores}`\n"
-            f"📺 Canal: `{canal_destino_usado or CANAL_ELEMENTOS}`\n"
+            f"✅ <b>Publicación completada</b>\n\n"
+            f"📦 Total procesados: <code>{total}</code>\n"
+            f"✅ Exitosos: <code>{exitosos}</code>\n"
+            f"❌ Errores: <code>{errores}</code>\n"
+            f"📺 Canal: <code>{canal_destino_usado or CANAL_ELEMENTOS}</code>\n"
             f"👤 Confirmado por: {escape(user.first_name)}",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
     except TelegramError:
         pass
 
 
 def register_index_publisher_handler(application):
-    """Registra el callback handler — sin CommandHandler, solo botones inline"""
     application.add_handler(CallbackQueryHandler(
         index_publicar_callback,
         pattern=r"^idxpub_(confirm|cancel)_"

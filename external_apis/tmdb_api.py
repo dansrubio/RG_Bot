@@ -39,7 +39,7 @@ def limpiar_nombre_archivo_cine(texto: str) -> str:
     
     for patron in patrones_basura:
         nombre = re.sub(patron, '', nombre)
-        
+    
     # Quitar años (ej. .2024. o [2019]) dejando el espacio
     nombre = re.sub(r'[\(\[\s\.]\d{4}[\)\]\s\.]', ' ', nombre)
     
@@ -154,7 +154,6 @@ def format_cine_telegram(post):
     if not post:
         return None
 
-    # CAMBIO AQUÍ: Ahora el título del post de entrega incluye solo el emoji, un espacio y el nombre
     icon = "🎬" if post['media_type'] == "movie" else "📺"
     lines = [
         f"<b>{icon} {html.escape(post['title'])}</b>",
@@ -175,15 +174,9 @@ def format_cine_telegram(post):
 
     links_line = []
     if post.get('trailer_url'):
-<<<<<<< HEAD
-        links_line.append(f"<a href='{post['trailer_url']}'>📺 Trailer</a>")
-    if post.get('tmdb_page_url'):
-        links_line.append(f"<a href='{post['tmdb_page_url']}'>📚 Información</a>")
-=======
         links_line.append(f"<a href='{post['trailer_url']}'>📺 Ver Trailer</a>")
     if post.get('tmdb_page_url'):
         links_line.append(f"<a href='{post['tmdb_page_url']}'>🌐 Ficha TMDB</a>")
->>>>>>> 616180587ff22d483db2b36fdbe20884df31b112
     
     if links_line:
         lines.append(" | ".join(links_line))
@@ -202,7 +195,6 @@ def build_cine_keyboard(results, page=0):
         media_type = r.get("media_type", "movie")
         icon = "🎬" if media_type == "movie" else "📺"
         
-        # MANTENIDO AQUÍ: Los años se siguen agregando al botón de la lista interactiva
         year = r.get("release_date", r.get("first_air_date", ""))[:4]
         year_str = f" ({year})" if year else ""
         
@@ -348,9 +340,5 @@ async def tmdb_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def register_cine_handlers(application):
     """Registra los handlers del módulo en la app principal."""
-<<<<<<< HEAD
-    application.add_handler(CommandHandler(["cine", "movie", "c"], buscarcine))
-=======
-    application.add_handler(CommandHandler(["cine", "movie", "tv"], buscarcine))
->>>>>>> 616180587ff22d483db2b36fdbe20884df31b112
+    application.add_handler(CommandHandler(["cine", "movie", "tv", "c"], buscarcine))
     application.add_handler(CallbackQueryHandler(tmdb_button, pattern="^(tmdbmedia_|tmdbpage_)"))
