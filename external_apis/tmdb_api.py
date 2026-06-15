@@ -175,9 +175,15 @@ def format_cine_telegram(post):
 
     links_line = []
     if post.get('trailer_url'):
+<<<<<<< HEAD
         links_line.append(f"<a href='{post['trailer_url']}'>📺 Trailer</a>")
     if post.get('tmdb_page_url'):
         links_line.append(f"<a href='{post['tmdb_page_url']}'>📚 Información</a>")
+=======
+        links_line.append(f"<a href='{post['trailer_url']}'>📺 Ver Trailer</a>")
+    if post.get('tmdb_page_url'):
+        links_line.append(f"<a href='{post['tmdb_page_url']}'>🌐 Ficha TMDB</a>")
+>>>>>>> 616180587ff22d483db2b36fdbe20884df31b112
     
     if links_line:
         lines.append(" | ".join(links_line))
@@ -342,5 +348,9 @@ async def tmdb_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def register_cine_handlers(application):
     """Registra los handlers del módulo en la app principal."""
+<<<<<<< HEAD
     application.add_handler(CommandHandler(["cine", "movie", "c"], buscarcine))
+=======
+    application.add_handler(CommandHandler(["cine", "movie", "tv"], buscarcine))
+>>>>>>> 616180587ff22d483db2b36fdbe20884df31b112
     application.add_handler(CallbackQueryHandler(tmdb_button, pattern="^(tmdbmedia_|tmdbpage_)"))
