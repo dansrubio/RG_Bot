@@ -186,3 +186,31 @@ def get_config_summary() -> dict:
             'rawg': bool(RAWG_API_KEY)
         }
     }
+
+
+# =========================================================
+# 🏷️ UTILIDADES DE ALMACÉN
+# =========================================================
+
+def obtener_nombre_almacen(almacen_id) -> str:
+    """
+    Centraliza la lógica para obtener el nombre legible de un almacén.
+    """
+    if not almacen_id or almacen_id == 0:
+        return "PC"
+        
+    aid_str = str(almacen_id)
+    
+    # Mapeo exacto basado en las variables de entorno
+    if aid_str == str(ADMINISTRATION_GROUP): 
+        return "PC"
+    if aid_str == str(os.getenv('ALMACEN_PS4', '')): 
+        return "PS4"
+    if aid_str == str(os.getenv('ALMACEN_SWITCH', '')): 
+        return "Switch"
+    if aid_str == str(os.getenv('ALMACEN_CANAIMA', '')): 
+        return "Canaima"
+    if aid_str == str(os.getenv('ALMACEN_AUDIOVISUALES', '')): 
+        return "Audiovisuales"
+        
+    return "PC"  # Fallback por defecto

@@ -16,7 +16,7 @@ from telegram.ext import CommandHandler, ContextTypes
 from telegram.helpers import escape_markdown
 from telegram.error import TelegramError, RetryAfter
 
-from config import BOT_URL, BOT_REGLAMENTO_URL, BOT_PRIVACIDAD_URL, ADMINISTRATION_GROUP, CANAL_ELEMENTOS, GP_ADMINS, TOPIC_LOG_SOLICITUDES, ALMACENES_MAP
+from config import BOT_URL, BOT_REGLAMENTO_URL, BOT_PRIVACIDAD_URL, ADMINISTRATION_GROUP, CANAL_ELEMENTOS, GP_ADMINS, TOPIC_LOG_SOLICITUDES, ALMACENES_MAP, obtener_nombre_almacen
 from database.crud.elemento_crud import ElementoCRUD
 from database.crud.usuario_crud import UsuarioCRUD
 from helpers.verification_system import verificar_membresia_canales, mostrar_alerta_union_canales
@@ -61,10 +61,11 @@ async def _notificar_solicitud_admin(context: ContextTypes.DEFAULT_TYPE, user, e
         
         # Obtener el nombre del almacén
         almacen_id = elemento_data.get('almacen_id')
-        # Intenta obtener el nombre desde la BD. Si no existe, lo busca en ALMACENES_MAP (asumiendo que es un diccionario).
         nombre_almacen = elemento_data.get('nombre_almacen')
+        
+        # Uso de la función centralizada
         if not nombre_almacen:
-            nombre_almacen = ALMACENES_MAP.get(almacen_id, "Almacén Principal") if isinstance(ALMACENES_MAP, dict) else str(almacen_id)
+            nombre_almacen = obtener_nombre_almacen(almacen_id)
 
         # Texto del log simplificado
         texto_log = (

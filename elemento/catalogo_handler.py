@@ -13,7 +13,8 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 
 from database.crud.elemento_crud import ElementoCRUD
 from database.base import MOTOR_AVAILABLE
-from config import ADMINISTRATION_GROUP
+# SE AGREGÓ: obtener_nombre_almacen
+from config import ADMINISTRATION_GROUP, obtener_nombre_almacen
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +28,7 @@ if MODO_ASYNC:
 else:
     logger.info("⚠️ Motor no disponible - Usando fallback sincrónico")
 
-
-def obtener_nombre_almacen(almacen_id) -> str:
-    """Traduce el ID del almacén a su nombre legible"""
-    if not almacen_id or almacen_id == 0:
-        return "PC"
-    aid_str = str(almacen_id)
-    if aid_str == str(ADMINISTRATION_GROUP): return "PC"
-    if aid_str == str(os.getenv('ALMACEN_PS4', '')): return "PS4"
-    if aid_str == str(os.getenv('ALMACEN_SWITCH', '')): return "Switch"
-    if aid_str == str(os.getenv('ALMACEN_CANAIMA', '')): return "Canaima"
-    if aid_str == str(os.getenv('ALMACEN_AUDIOVISUALES', '')): return "Audiovisuales"
-    return "PC"
-
+# SE ELIMINÓ: La función duplicada obtener_nombre_almacen() que estaba aquí.
 
 async def _obtener_letras_disponibles(context: ContextTypes.DEFAULT_TYPE) -> dict:
     cache_key = "catalogo_letras_cache"

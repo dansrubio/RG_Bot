@@ -10,7 +10,7 @@ from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes
 from html import escape
 
-from config import is_admin, BOT_URL, ADMINISTRATION_GROUP
+from config import is_admin, BOT_URL, ADMINISTRATION_GROUP, obtener_nombre_almacen
 from database.crud.elemento_crud import ElementoCRUD
 
 logger = logging.getLogger(__name__)
@@ -126,11 +126,8 @@ async def _mostrar_pagina_recomendados(update: Update, context: ContextTypes.DEF
         solicitudes = elem.get('solicitudes', 0)
         almacen_id = elem.get('almacen_id')
         
-        # Identificar si es el almacén principal o mostrar el ID del almacén secundario
-        if not almacen_id or almacen_id == ADMINISTRATION_GROUP:
-            almacen_display = "Principal"
-        else:
-            almacen_display = str(almacen_id)
+        # Uso de la función centralizada
+        almacen_display = obtener_nombre_almacen(almacen_id)
         
         texto += (
             f"🎮 <a href='{link}'><b>{nombre}</b></a>\n"

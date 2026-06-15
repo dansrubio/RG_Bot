@@ -6,7 +6,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatType, ParseMode
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-from config import BOT_URL, is_admin, is_staff, ADMINISTRATION_GROUP
+# SE AGREGÓ: obtener_nombre_almacen a las importaciones
+from config import BOT_URL, is_admin, is_staff, ADMINISTRATION_GROUP, obtener_nombre_almacen
 from database.base import get_database
 
 logger = logging.getLogger(__name__)
@@ -18,19 +19,7 @@ ELEMENTOS_POR_PAGINA = 5
 
 _REGEX_SIMBOLOS = re.compile(r'[^\w\s]', re.UNICODE)
 
-
-def obtener_nombre_almacen(almacen_id) -> str:
-    """Traduce el ID del almacén a su nombre legible"""
-    if not almacen_id or almacen_id == 0:
-        return "PC"
-    aid_str = str(almacen_id)
-    if aid_str == str(ADMINISTRATION_GROUP): return "PC"
-    if aid_str == str(os.getenv('ALMACEN_PS4', '')): return "PS4"
-    if aid_str == str(os.getenv('ALMACEN_SWITCH', '')): return "Switch"
-    if aid_str == str(os.getenv('ALMACEN_CANAIMA', '')): return "Canaima"
-    if aid_str == str(os.getenv('ALMACEN_AUDIOVISUALES', '')): return "Audiovisuales"
-    return "PC"
-
+# SE ELIMINÓ: La función duplicada obtener_nombre_almacen() que estaba aquí.
 
 def _es_busqueda_spam(texto: str) -> bool:
     return len(texto) > MAX_LONGITUD_TEXTO or len(texto.split()) > MAX_PALABRAS

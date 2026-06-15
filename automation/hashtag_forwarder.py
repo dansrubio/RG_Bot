@@ -13,7 +13,8 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 
-from config import GROUP_ADMIN_ID, GP_ADMINS, TOPIC_SOLICITUDES, TOPIC_ERRORES, BOT_URL, ADMIN_IDS, MOD_IDS, ADMINISTRATION_GROUP
+# SE AGREGÓ: obtener_nombre_almacen
+from config import GROUP_ADMIN_ID, GP_ADMINS, TOPIC_SOLICITUDES, TOPIC_ERRORES, BOT_URL, ADMIN_IDS, MOD_IDS, ADMINISTRATION_GROUP, obtener_nombre_almacen
 from database.base import get_database
 from database.models.schemas import TicketSolicitudSchema
 from database.crud.usuario_crud import UsuarioCRUD
@@ -39,18 +40,7 @@ async def borrar_mensaje_temporal(bot, chat_id, message_id, delay=30):
         pass
 
 
-def obtener_nombre_almacen(almacen_id) -> str:
-    """Traduce el ID del almacén a su nombre legible"""
-    if not almacen_id or almacen_id == 0:
-        return "PC"
-    aid_str = str(almacen_id)
-    if aid_str == str(ADMINISTRATION_GROUP): return "PC"
-    if aid_str == str(os.getenv('ALMACEN_PS4', '')): return "PS4"
-    if aid_str == str(os.getenv('ALMACEN_SWITCH', '')): return "Switch"
-    if aid_str == str(os.getenv('ALMACEN_CANAIMA', '')): return "Canaima"
-    if aid_str == str(os.getenv('ALMACEN_AUDIOVISUALES', '')): return "Audiovisuales"
-    return "PC"
-
+# SE ELIMINÓ: La función duplicada obtener_nombre_almacen() que estaba aquí.
 
 def extraer_hashtags(texto: str) -> set:
     if not texto: return set()
