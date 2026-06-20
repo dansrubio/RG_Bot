@@ -1,4 +1,4 @@
-# 🎮 Rednite Bot — Refugio Gamer
+# 🎮 Rednite Bot - Refugio Gamer
 
 Bot de Telegram modular construido con `python-telegram-bot` v20+, MongoDB y Telethon.
 Gestiona un catálogo de juegos con entrega automática de archivos, sistema de solicitudes, publicación en canales y múltiples almacenes independientes.
